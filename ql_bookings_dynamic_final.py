@@ -10,7 +10,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-df = pd.read_csv("C:/Users/Computer/Desktop/MLlab/Project/Big Data/bookings.csv")   
+df = pd.read_csv("bookings3.csv")   
 # Clean: convert and drop null distances
 df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
 df = df.dropna(subset=['Ride Distance'])
@@ -203,7 +203,7 @@ START_CITY = "AIIMS"          # <-- Change me!
 GOAL_CITY  = "Anand Vihar"    # <-- Change me!
 
 import pandas as pd
-_df = pd.read_csv("C:/Users/Computer/Desktop/MLlab/Project/Big Data/bookings.csv")
+_df = pd.read_csv("bookings.csv")
 _df['Ride Distance'] = pd.to_numeric(_df['Ride Distance'], errors='coerce')
 _df = _df.dropna(subset=['Ride Distance'])
 _cities = sorted(set(_df['Pickup Location']).union(set(_df['Drop Location'])))
