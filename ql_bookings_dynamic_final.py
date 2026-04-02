@@ -203,7 +203,7 @@ START_CITY = "AIIMS"          # <-- Change me!
 GOAL_CITY  = "Anand Vihar"    # <-- Change me!
 
 import pandas as pd
-_df = pd.read_csv("bookings.csv")
+_df = pd.read_csv("bookings3.csv")
 _df['Ride Distance'] = pd.to_numeric(_df['Ride Distance'], errors='coerce')
 _df = _df.dropna(subset=['Ride Distance'])
 _cities = sorted(set(_df['Pickup Location']).union(set(_df['Drop Location'])))
@@ -231,7 +231,7 @@ random.seed(42)
 np.random.seed(42)
 
 # -- Load data --
-df          = pd.read_csv("C:/Users/Computer/Desktop/MLlab/Project/Big Data/bookings.csv")
+df          = pd.read_csv("bookings3.csv")
 df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
 df          = df.dropna(subset=['Ride Distance'])
 cities      = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
