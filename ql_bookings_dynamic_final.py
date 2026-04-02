@@ -455,3 +455,130 @@ plt.tight_layout()
 plt.savefig(f"dynamic_env_{START_CITY}_to_{GOAL_CITY}.png",
             dpi=150, bbox_inches='tight', facecolor='#0d0d1a')
 plt.show()
+
+
+
+def run_dynamic_route(start_city, goal_city, df):
+
+    import numpy as np
+    import random
+    import matplotlib.pyplot as plt
+    from collections import Counter
+
+    # =========================
+    # PREPARE DATA (same as your code)
+    # =========================
+    cities = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
+    city_to_idx = {city: i for i, city in enumerate(cities)}
+    idx_to_city = {i: city for city, i in city_to_idx.items()}
+    n = len(cities)
+
+    base_dm = np.full((n, n), np.inf)
+    np.fill_diagonal(base_dm, 0)
+
+    for _, row in df.iterrows():
+        i = city_to_idx[row['Pickup Location']]
+        j = city_to_idx[row['Drop Location']]
+        d = row['Ride Distance']
+
+        if d < base_dm[i, j]:
+            base_dm[i, j] = d
+            base_dm[j, i] = d
+
+    edges = [(i, j) for i in range(n) for j in range(i+1, n) if base_dm[i, j] != np.inf]
+
+    # =========================
+    # EVENTS
+    # =========================
+    def generate_events():
+        emap = {}
+        for i, j in edges:
+            r = random.random()
+            if r < 0.1:
+                emap[(i, j)] = 'BLOCKAGE'
+            elif r < 0.3:
+                emap[(i, j)] = 'TRAFFIC'
+            else:
+                emap[(i, j)] = 'CLEAR'
+        return emap
+
+    event_map = generate_events()
+    dyn_dm = base_dm.copy()
+
+    for (i, j), evt in event_map.items():
+        if evt == 'BLOCKAGE':
+            dyn_dm[i, j] = np.inf
+            dyn_dm[j, i] = np.inf
+        elif evt == 'TRAFFIC':
+            dyn_dm[i, j] *= 1.5
+            dyn_dm[j, i] *= 1.5
+
+    # =========================
+    # Q LEARNING
+    # =========================
+    Q = np.zeros((n, n))
+
+    def valid_actions(s):
+        return [i for i in range(n) if dyn_dm[s, i] != np.inf and i != s]
+
+    s = city_to_idx[start_city]
+    g = city_to_idx[goal_city]
+
+    for _ in range(3000):
+        state = s
+        while state != g:
+            actions = valid_actions(state)
+            if not actions:
+                break
+
+            action = random.choice(actions)
+            reward = 1000 if action == g else -dyn_dm[state, action]
+
+            future = max([Q[action, a] for a in valid_actions(action)], default=0)
+
+            Q[state, action] += 0.8 * (reward + 0.95 * future - Q[state, action])
+
+            state = action
+
+    # =========================
+    # PATH
+    # =========================
+    path_idx = [s]
+    state = s
+
+    while state != g:
+        actions = valid_actions(state)
+        if not actions:
+            break
+
+        action = max(actions, key=lambda a: Q[state, a])
+        path_idx.append(action)
+        state = action
+
+    path = [idx_to_city[i] for i in path_idx]
+
+    dist = 0
+    for i in range(len(path)-1):
+        dist += base_dm[city_to_idx[path[i]], city_to_idx[path[i+1]]]
+
+    # =========================
+    # GRAPH FIGURE
+    # =========================
+    import networkx as nx
+
+    G = nx.Graph()
+    for city in cities:
+        G.add_node(city)
+
+    for i, j in edges:
+        G.add_edge(idx_to_city[i], idx_to_city[j])
+
+    pos = nx.spring_layout(G, seed=42)
+
+    fig, ax = plt.subplots(figsize=(8,6))
+    nx.draw(G, pos, node_size=50, ax=ax)
+
+    path_edges = list(zip(path, path[1:]))
+    nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='red', width=3, ax=ax)
+
+    return path, dist, fig
