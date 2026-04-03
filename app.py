@@ -1,4 +1,4 @@
-
+'''
 import streamlit as st
 import pandas as pd
 import random
@@ -119,4 +119,95 @@ if st.button("🚀 Find Route"):
     folium.Marker(coords[start], icon=folium.Icon(color="green")).add_to(m)
     folium.Marker(coords[goal], icon=folium.Icon(color="red")).add_to(m)
 
+    st_folium(m, width=900, height=500) '''
+import streamlit as st
+import pandas as pd
+import random
+import folium
+from streamlit_folium import st_folium
+import ql_bookings_dynamic_final as ql
+
+st.set_page_config(layout="wide")
+
+st.title("🚀 Smart Route Optimizer (Dynamic)")
+
+# =========================
+# LOAD DATA
+# =========================
+@st.cache_data
+def load_data():
+    df = pd.read_csv("bookings3.csv", encoding="latin1", on_bad_lines='skip')
+    df.columns = df.columns.str.strip()
+    df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
+    df = df.dropna(subset=['Ride Distance', 'Pickup Location', 'Drop Location'])
+    return df
+
+df = load_data()
+
+# =========================
+# CITY LIST
+# =========================
+cities = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
+
+col1, col2 = st.columns(2)
+
+start = col1.selectbox("🟢 Source", cities)
+goal  = col2.selectbox("🔴 Destination", cities)
+
+colA, colB = st.columns(2)
+
+if colA.button("🔄 Swap"):
+    start, goal = goal, start
+
+if colB.button("🧹 Clear"):
+    st.experimental_rerun()
+
+# =========================
+# ROUTE BUTTON
+# =========================
+if st.button("🚀 Find Route"):
+
+    with st.spinner("Calculating route..."):
+
+        path, dist = ql.run_dynamic_route(start, goal, df)
+
+    st.success("✅ Route Found")
+
+    st.write(f"📏 Distance: {dist:.2f} km")
+    st.write(f"📍 Path: {' → '.join(path)}")
+
+    # =========================
+    # MAP (STABLE)
+    # =========================
+    coords = {city: (random.uniform(20, 28), random.uniform(70, 88)) for city in cities}
+
+    m = folium.Map(location=coords[start], zoom_start=5)
+
+    route_coords = [coords[c] for c in path]
+
+    folium.PolyLine(route_coords, color="blue", weight=5).add_to(m)
+
+    folium.Marker(coords[start], tooltip=start,
+                  icon=folium.Icon(color="green")).add_to(m)
+
+    folium.Marker(coords[goal], tooltip=goal,
+                  icon=folium.Icon(color="red")).add_to(m)
+
     st_folium(m, width=900, height=500)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
