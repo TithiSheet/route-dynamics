@@ -583,7 +583,7 @@ def run_dynamic_route(start_city, goal_city, df):
 
     return path, dist, fig '''
 
-    import streamlit as st
+import streamlit as st
 import pandas as pd
 import networkx as nx
 import random
