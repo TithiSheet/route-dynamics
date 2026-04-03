@@ -520,79 +520,62 @@ def run_dynamic_route(start_city, goal_city, df):
 
     def valid_actions(s):
         return [i for i in range(n) if dyn_dm[s, i] != np.inf and i != s]
-
     s = city_to_idx[start_city]
     g = city_to_idx[goal_city]
-
     for _ in range(500):
         state = s
         while state != g:
             actions = valid_actions(state)
             if not actions:
                 break
-
             action = random.choice(actions)
             reward = 1000 if action == g else -dyn_dm[state, action]
-
             future = max([Q[action, a] for a in valid_actions(action)], default=0)
-
             Q[state, action] += 0.8 * (reward + 0.95 * future - Q[state, action])
-
             state = action
-
     # =========================
     # PATH
     # =========================
     path_idx = [s]
     state = s
-
     while state != g:
         actions = valid_actions(state)
         if not actions:
             break
-
         action = max(actions, key=lambda a: Q[state, a])
         path_idx.append(action)
         state = action
-
     path = [idx_to_city[i] for i in path_idx]
-
     dist = 0
     for i in range(len(path)-1):
         dist += base_dm[city_to_idx[path[i]], city_to_idx[path[i+1]]]
-
     # =========================
     # GRAPH FIGURE
     # =========================
     import networkx as nx
-
     G = nx.Graph()
     for city in cities:
         G.add_node(city)
-
     for i, j in edges:
         G.add_edge(idx_to_city[i], idx_to_city[j])
-
     pos = nx.spring_layout(G, seed=42)
-
     fig, ax = plt.subplots(figsize=(8,6))
     nx.draw(G, pos, node_size=50, ax=ax)
-
     path_edges = list(zip(path, path[1:]))
     nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='red', width=3, ax=ax)
-
     return path, dist, fig '''
 
 import streamlit as st
 import pandas as pd
 import networkx as nx
 import random
+import matplotlib.pyplot as plt
 import folium
 from streamlit_folium import st_folium
 
 st.set_page_config(layout="wide")
 
-st.title("🚀 Smart Route Optimizer (Dynamic AI Version)")
+st.title("🚀 Smart Route Optimizer (Dynamic Environment)")
 
 # =========================
 # LOAD DATA
@@ -614,8 +597,8 @@ def load_data():
 
 df = load_data()
 
-if df is None or df.empty:
-    st.error("❌ Data issue")
+if df.empty:
+    st.error("❌ Data not loaded")
     st.stop()
 
 # =========================
@@ -640,31 +623,7 @@ def build_graph(df):
 
 G = build_graph(df)
 
-# =========================
-# CITY LIST
-# =========================
 cities = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
-
-# =========================
-# SIDEBAR GRAPH (ALWAYS VISIBLE)
-# =========================
-st.sidebar.title("📊 Network Graph")
-
-import matplotlib.pyplot as plt
-
-fig, ax = plt.subplots()
-pos = nx.spring_layout(G, seed=42)
-
-nx.draw(
-    G,
-    pos,
-    node_size=10,
-    node_color="blue",
-    edge_color="gray",
-    ax=ax
-)
-
-st.sidebar.pyplot(fig)
 
 # =========================
 # UI INPUT
@@ -674,65 +633,103 @@ col1, col2 = st.columns(2)
 start = col1.selectbox("🟢 Source", cities)
 goal = col2.selectbox("🔴 Destination", cities)
 
-colA, colB = st.columns(2)
-
-if colA.button("🔄 Swap"):
-    start, goal = goal, start
-
-if colB.button("🧹 Clear"):
-    st.rerun()
-
 # =========================
-# DYNAMIC EVENTS
+# DYNAMIC CONDITIONS
 # =========================
-def dynamic_events(G):
+def apply_dynamic_conditions(G):
     temp = G.copy()
+    event_map = {}
 
     for u, v in temp.edges():
         r = random.random()
 
         if r < 0.05:
-            temp.remove_edge(u, v)  # blockage
-        elif r < 0.2:
-            temp[u][v]['weight'] *= 1.5  # traffic
+            temp.remove_edge(u, v)
+            event_map[(u, v)] = "🚧 BLOCKED"
+        elif r < 0.20:
+            temp[u][v]['weight'] *= 1.5
+            event_map[(u, v)] = "🚦 TRAFFIC"
+        elif r < 0.30:
+            temp[u][v]['weight'] *= 1.3
+            event_map[(u, v)] = "🌧 BAD WEATHER"
+        else:
+            event_map[(u, v)] = "✅ CLEAR"
 
-    return temp
+    return temp, event_map
 
 # =========================
-# FIXED COORDS (NO BLINKING)
+# FIXED COORDS (NO BLINK)
 # =========================
 random.seed(42)
 coords = {city: (random.uniform(20, 28), random.uniform(70, 88)) for city in cities}
 
 # =========================
-# FIND ROUTE
+# BUTTON
 # =========================
-if st.button("🚀 Find Route"):
+if st.button("🚀 Find Optimal Route"):
 
-    temp_G = dynamic_events(G)
+    temp_G, event_map = apply_dynamic_conditions(G)
 
     try:
         path = nx.shortest_path(temp_G, start, goal, weight='weight')
         dist = nx.shortest_path_length(temp_G, start, goal, weight='weight')
     except:
-        st.error("❌ No route found")
+        st.error("❌ No route available due to conditions")
         st.stop()
 
-    stops = len(path) - 1
-    time_minutes = (dist / 40) * 60
+    # =========================
+    # RESULT
+    # =========================
+    st.success("✅ Optimal Route Found")
 
-    # =========================
-    # RESULT BOX (STATIC)
-    # =========================
-    st.success("✅ Route Found")
+    stops = len(path) - 1
+    time = (dist / 40) * 60
 
     st.write(f"📍 Path: {' → '.join(path)}")
     st.write(f"📏 Distance: {dist:.2f} km")
     st.write(f"🛑 Stops: {stops}")
-    st.write(f"⏱️ Time: {time_minutes:.0f} mins")
+    st.write(f"⏱️ Time: {time:.0f} mins")
 
     # =========================
-    # MAP (STABLE + ROUTE)
+    # GRAPH (ONLY ROUTE + NEARBY)
+    # =========================
+    st.subheader("📊 Route Graph with Dynamic Conditions")
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+
+    sub_nodes = set(path)
+    sub_G = G.subgraph(sub_nodes)
+
+    pos = nx.spring_layout(sub_G, seed=42)
+
+    edge_colors = []
+    for u, v in sub_G.edges():
+        event = event_map.get((u, v), "CLEAR")
+
+        if "BLOCKED" in event:
+            edge_colors.append("red")
+        elif "TRAFFIC" in event:
+            edge_colors.append("orange")
+        elif "WEATHER" in event:
+            edge_colors.append("purple")
+        else:
+            edge_colors.append("green")
+
+    nx.draw(
+        sub_G,
+        pos,
+        with_labels=True,
+        node_color="skyblue",
+        edge_color=edge_colors,
+        node_size=800,
+        font_size=8,
+        ax=ax
+    )
+
+    st.pyplot(fig)
+
+    # =========================
+    # MAP
     # =========================
     st.subheader("🗺️ Route Map")
 
@@ -740,12 +737,29 @@ if st.button("🚀 Find Route"):
 
     route_coords = [coords[c] for c in path]
 
-    # Draw route
     folium.PolyLine(route_coords, color="blue", weight=5).add_to(m)
 
-    # Markers
     folium.Marker(coords[start], popup=start, icon=folium.Icon(color="green")).add_to(m)
     folium.Marker(coords[goal], popup=goal, icon=folium.Icon(color="red")).add_to(m)
 
-    # Show map
     st_folium(m, width=900, height=500)
+
+    # =========================
+    # EVENT LEGEND
+    # =========================
+    st.subheader("⚡ Dynamic Conditions Legend")
+
+    st.write("🔴 Red = Blocked Road")
+    st.write("🟠 Orange = Heavy Traffic")
+    st.write("🟣 Purple = Bad Weather")
+    st.write("🟢 Green = Clear Road")
+
+
+
+
+
+
+
+
+
+
