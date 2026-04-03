@@ -524,7 +524,7 @@ def run_dynamic_route(start_city, goal_city, df):
     s = city_to_idx[start_city]
     g = city_to_idx[goal_city]
 
-    for _ in range(3000):
+    for _ in range(500):
         state = s
         while state != g:
             actions = valid_actions(state)
