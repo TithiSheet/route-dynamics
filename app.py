@@ -108,10 +108,15 @@ st.set_page_config(layout="wide")
 st.title("🚀 Smart Route Optimizer (Dynamic Environment)")
 
 # =========================
-# LOAD DATA (ONLY FOR UI)
+# LOAD DATA
 # =========================
-df = pd.read_csv("bookings3.csv")
-df.columns = df.columns.str.strip()
+@st.cache_data
+def load_data():
+    df = pd.read_csv("bookings3.csv", encoding="latin1", on_bad_lines="skip")
+    df.columns = df.columns.str.strip()
+    return df
+
+df = load_data()
 
 cities = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
 
@@ -124,10 +129,15 @@ start = col1.selectbox("🟢 Source", cities)
 goal  = col2.selectbox("🔴 Destination", cities)
 
 # =========================
-# GRAPH PLACE (ALWAYS SHOW)
+# GRAPH PLACE (EMPTY FIRST)
 # =========================
 graph_placeholder = st.empty()
 
+st.write("👆 Select cities and click 'Find Route'")
+
+# =========================
+# GRAPH FUNCTION
+# =========================
 def draw_graph(G, path=None, event_map=None):
     fig, ax = plt.subplots(figsize=(8,5))
     pos = nx.spring_layout(G, seed=42)
@@ -163,20 +173,20 @@ def draw_graph(G, path=None, event_map=None):
     ax.axis("off")
     return fig
 
-# Initial graph
-_, _, _, G = ql.run_dynamic_route(start, goal)
-graph_placeholder.pyplot(draw_graph(G))
-
 # =========================
-# BUTTON
+# BUTTON (ONLY RUN LOGIC HERE)
 # =========================
 if st.button("🚀 Find Route"):
 
-    path, dist, event_map, G = ql.run_dynamic_route(start, goal)
+    with st.spinner("Calculating..."):
 
-    if path is None:
+        result = ql.run_dynamic_route(start, goal)
+
+    if result is None or result[0] is None:
         st.error("❌ No path found")
     else:
+        path, dist, event_map, G = result
+
         st.success("✅ Route Found")
 
         st.write(f"📍 Path: {' → '.join(path)}")
@@ -187,11 +197,3 @@ if st.button("🚀 Find Route"):
 
         st.subheader("⚡ Conditions")
         st.write("🔴 Blocked | 🟠 Traffic | 🟣 Weather | 🟢 Path")
-
-
-
-
-
-
-
-
