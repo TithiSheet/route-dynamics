@@ -3,7 +3,7 @@
 # Next step (optional): refactor into modules & generate tests with RunCell
 # Quick start: pip install runcell
 
-import random
+''' import random
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -581,4 +581,171 @@ def run_dynamic_route(start_city, goal_city, df):
     path_edges = list(zip(path, path[1:]))
     nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='red', width=3, ax=ax)
 
-    return path, dist, fig
+    return path, dist, fig '''
+
+    import streamlit as st
+import pandas as pd
+import networkx as nx
+import random
+import folium
+from streamlit_folium import st_folium
+
+st.set_page_config(layout="wide")
+
+st.title("🚀 Smart Route Optimizer (Dynamic AI Version)")
+
+# =========================
+# LOAD DATA
+# =========================
+@st.cache_data
+def load_data():
+    df = pd.read_csv(
+        "bookings3.csv",
+        encoding="latin1",
+        on_bad_lines="skip",
+        engine="python"
+    )
+
+    df.columns = df.columns.str.strip()
+    df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
+    df = df.dropna(subset=['Ride Distance', 'Pickup Location', 'Drop Location'])
+
+    return df
+
+df = load_data()
+
+if df is None or df.empty:
+    st.error("❌ Data issue")
+    st.stop()
+
+# =========================
+# BUILD GRAPH
+# =========================
+@st.cache_resource
+def build_graph(df):
+    G = nx.Graph()
+
+    for _, row in df.iterrows():
+        u = row['Pickup Location']
+        v = row['Drop Location']
+        d = row['Ride Distance']
+
+        if G.has_edge(u, v):
+            if d < G[u][v]['weight']:
+                G[u][v]['weight'] = d
+        else:
+            G.add_edge(u, v, weight=d)
+
+    return G
+
+G = build_graph(df)
+
+# =========================
+# CITY LIST
+# =========================
+cities = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
+
+# =========================
+# SIDEBAR GRAPH (ALWAYS VISIBLE)
+# =========================
+st.sidebar.title("📊 Network Graph")
+
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+pos = nx.spring_layout(G, seed=42)
+
+nx.draw(
+    G,
+    pos,
+    node_size=10,
+    node_color="blue",
+    edge_color="gray",
+    ax=ax
+)
+
+st.sidebar.pyplot(fig)
+
+# =========================
+# UI INPUT
+# =========================
+col1, col2 = st.columns(2)
+
+start = col1.selectbox("🟢 Source", cities)
+goal = col2.selectbox("🔴 Destination", cities)
+
+colA, colB = st.columns(2)
+
+if colA.button("🔄 Swap"):
+    start, goal = goal, start
+
+if colB.button("🧹 Clear"):
+    st.rerun()
+
+# =========================
+# DYNAMIC EVENTS
+# =========================
+def dynamic_events(G):
+    temp = G.copy()
+
+    for u, v in temp.edges():
+        r = random.random()
+
+        if r < 0.05:
+            temp.remove_edge(u, v)  # blockage
+        elif r < 0.2:
+            temp[u][v]['weight'] *= 1.5  # traffic
+
+    return temp
+
+# =========================
+# FIXED COORDS (NO BLINKING)
+# =========================
+random.seed(42)
+coords = {city: (random.uniform(20, 28), random.uniform(70, 88)) for city in cities}
+
+# =========================
+# FIND ROUTE
+# =========================
+if st.button("🚀 Find Route"):
+
+    temp_G = dynamic_events(G)
+
+    try:
+        path = nx.shortest_path(temp_G, start, goal, weight='weight')
+        dist = nx.shortest_path_length(temp_G, start, goal, weight='weight')
+    except:
+        st.error("❌ No route found")
+        st.stop()
+
+    stops = len(path) - 1
+    time_minutes = (dist / 40) * 60
+
+    # =========================
+    # RESULT BOX (STATIC)
+    # =========================
+    st.success("✅ Route Found")
+
+    st.write(f"📍 Path: {' → '.join(path)}")
+    st.write(f"📏 Distance: {dist:.2f} km")
+    st.write(f"🛑 Stops: {stops}")
+    st.write(f"⏱️ Time: {time_minutes:.0f} mins")
+
+    # =========================
+    # MAP (STABLE + ROUTE)
+    # =========================
+    st.subheader("🗺️ Route Map")
+
+    m = folium.Map(location=coords[start], zoom_start=6)
+
+    route_coords = [coords[c] for c in path]
+
+    # Draw route
+    folium.PolyLine(route_coords, color="blue", weight=5).add_to(m)
+
+    # Markers
+    folium.Marker(coords[start], popup=start, icon=folium.Icon(color="green")).add_to(m)
+    folium.Marker(coords[goal], popup=goal, icon=folium.Icon(color="red")).add_to(m)
+
+    # Show map
+    st_folium(m, width=900, height=500)
