@@ -588,61 +588,46 @@ def load_data():
         on_bad_lines="skip",
         engine="python"
     )
-
     df.columns = df.columns.str.strip()
     df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
     df = df.dropna(subset=['Ride Distance', 'Pickup Location', 'Drop Location'])
-
     return df
-
 df = load_data()
-
 if df.empty:
     st.error("❌ Data not loaded")
     st.stop()
-
 # =========================
 # BUILD GRAPH
 # =========================
 @st.cache_resource
 def build_graph(df):
     G = nx.Graph()
-
     for _, row in df.iterrows():
         u = row['Pickup Location']
         v = row['Drop Location']
         d = row['Ride Distance']
-
         if G.has_edge(u, v):
             if d < G[u][v]['weight']:
                 G[u][v]['weight'] = d
         else:
             G.add_edge(u, v, weight=d)
-
     return G
-
 G = build_graph(df)
-
 cities = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
-
 # =========================
 # UI INPUT
 # =========================
 col1, col2 = st.columns(2)
-
 start = col1.selectbox("🟢 Source", cities)
 goal = col2.selectbox("🔴 Destination", cities)
-
 # =========================
 # DYNAMIC CONDITIONS
 # =========================
 def apply_dynamic_conditions(G):
     temp = G.copy()
     event_map = {}
-
     for u, v in temp.edges():
         r = random.random()
-
         if r < 0.05:
             temp.remove_edge(u, v)
             event_map[(u, v)] = "🚧 BLOCKED"
@@ -654,58 +639,44 @@ def apply_dynamic_conditions(G):
             event_map[(u, v)] = "🌧 BAD WEATHER"
         else:
             event_map[(u, v)] = "✅ CLEAR"
-
     return temp, event_map
-
 # =========================
 # FIXED COORDS (NO BLINK)
 # =========================
 random.seed(42)
 coords = {city: (random.uniform(20, 28), random.uniform(70, 88)) for city in cities}
-
 # =========================
 # BUTTON
 # =========================
 if st.button("🚀 Find Optimal Route"):
-
     temp_G, event_map = apply_dynamic_conditions(G)
-
     try:
         path = nx.shortest_path(temp_G, start, goal, weight='weight')
         dist = nx.shortest_path_length(temp_G, start, goal, weight='weight')
     except:
         st.error("❌ No route available due to conditions")
         st.stop()
-
     # =========================
     # RESULT
     # =========================
     st.success("✅ Optimal Route Found")
-
     stops = len(path) - 1
     time = (dist / 40) * 60
-
     st.write(f"📍 Path: {' → '.join(path)}")
     st.write(f"📏 Distance: {dist:.2f} km")
     st.write(f"🛑 Stops: {stops}")
     st.write(f"⏱️ Time: {time:.0f} mins")
-
-    # =========================
+    # ========================
     # GRAPH (ONLY ROUTE + NEARBY)
     # =========================
     st.subheader("📊 Route Graph with Dynamic Conditions")
-
     fig, ax = plt.subplots(figsize=(6, 4))
-
     sub_nodes = set(path)
     sub_G = G.subgraph(sub_nodes)
-
     pos = nx.spring_layout(sub_G, seed=42)
-
     edge_colors = []
     for u, v in sub_G.edges():
         event = event_map.get((u, v), "CLEAR")
-
         if "BLOCKED" in event:
             edge_colors.append("red")
         elif "TRAFFIC" in event:
@@ -714,7 +685,6 @@ if st.button("🚀 Find Optimal Route"):
             edge_colors.append("purple")
         else:
             edge_colors.append("green")
-
     nx.draw(
         sub_G,
         pos,
@@ -725,35 +695,25 @@ if st.button("🚀 Find Optimal Route"):
         font_size=8,
         ax=ax
     )
-
     st.pyplot(fig)
-
     # =========================
     # MAP
     # =========================
     st.subheader("🗺️ Route Map")
-
     m = folium.Map(location=coords[start], zoom_start=6)
-
     route_coords = [coords[c] for c in path]
-
     folium.PolyLine(route_coords, color="blue", weight=5).add_to(m)
-
     folium.Marker(coords[start], popup=start, icon=folium.Icon(color="green")).add_to(m)
     folium.Marker(coords[goal], popup=goal, icon=folium.Icon(color="red")).add_to(m)
-
     st_folium(m, width=900, height=500)
-
     # =========================
     # EVENT LEGEND
     # =========================
     st.subheader("⚡ Dynamic Conditions Legend")
-
     st.write("🔴 Red = Blocked Road")
     st.write("🟠 Orange = Heavy Traffic")
     st.write("🟣 Purple = Bad Weather")
     st.write("🟢 Green = Clear Road")
-
 
 
 
