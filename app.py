@@ -98,54 +98,25 @@ if st.button("🚀 Find Route"):
     st_folium(m, width=900, height=500) '''
 import streamlit as st
 import pandas as pd
-import networkx as nx
 import matplotlib.pyplot as plt
-import random
+import networkx as nx
 
-# 👉 IMPORT YOUR LOGIC FILE
 import ql_bookings_dynamic_final as ql
 
 st.set_page_config(layout="wide")
 
-st.title("🚀 Smart Route Optimizer (Dynamic)")
+st.title("🚀 Smart Route Optimizer (Dynamic Environment)")
 
 # =========================
-# LOAD DATA
+# LOAD DATA (ONLY FOR UI)
 # =========================
-@st.cache_data
-def load_data():
-    df = pd.read_csv("bookings3.csv", encoding="latin1", on_bad_lines="skip")
-    df.columns = df.columns.str.strip()
-    df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
-    df = df.dropna(subset=['Ride Distance', 'Pickup Location', 'Drop Location'])
-    return df
-
-df = load_data()
+df = pd.read_csv("bookings3.csv")
+df.columns = df.columns.str.strip()
 
 cities = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
 
 # =========================
-# BUILD GRAPH
-# =========================
-@st.cache_resource
-def build_graph(df):
-    G = nx.Graph()
-    for _, row in df.iterrows():
-        u = row['Pickup Location']
-        v = row['Drop Location']
-        d = row['Ride Distance']
-
-        if G.has_edge(u, v):
-            if d < G[u][v]['weight']:
-                G[u][v]['weight'] = d
-        else:
-            G.add_edge(u, v, weight=d)
-    return G
-
-G = build_graph(df)
-
-# =========================
-# UI INPUT
+# INPUT
 # =========================
 col1, col2 = st.columns(2)
 
@@ -153,65 +124,47 @@ start = col1.selectbox("🟢 Source", cities)
 goal  = col2.selectbox("🔴 Destination", cities)
 
 # =========================
-# GRAPH PLACEHOLDER (ALWAYS VISIBLE)
+# GRAPH PLACE (ALWAYS SHOW)
 # =========================
 graph_placeholder = st.empty()
 
-# =========================
-# FUNCTION TO DRAW GRAPH
-# =========================
 def draw_graph(G, path=None, event_map=None):
-    fig, ax = plt.subplots(figsize=(8, 5))
-
+    fig, ax = plt.subplots(figsize=(8,5))
     pos = nx.spring_layout(G, seed=42)
 
-    # Default edge colors
-    edge_colors = []
+    colors = []
     for u, v in G.edges():
         if event_map:
-            evt = event_map.get((u, v), event_map.get((v, u), "CLEAR"))
+            evt = event_map.get((u,v), event_map.get((v,u),"CLEAR"))
 
             if evt == "BLOCKED":
-                edge_colors.append("red")
+                colors.append("red")
             elif evt == "TRAFFIC":
-                edge_colors.append("orange")
-            elif evt == "WORK":
-                edge_colors.append("purple")
+                colors.append("orange")
             elif evt == "WEATHER":
-                edge_colors.append("blue")
+                colors.append("purple")
             else:
-                edge_colors.append("gray")
+                colors.append("gray")
         else:
-            edge_colors.append("gray")
+            colors.append("gray")
 
-    nx.draw(G, pos, edge_color=edge_colors, node_size=200, ax=ax)
+    nx.draw(G, pos, edge_color=colors, node_size=200, ax=ax)
 
-    # Highlight path
     if path:
         edges = list(zip(path, path[1:]))
-        nx.draw_networkx_edges(G, pos, edgelist=edges, width=4, edge_color="green", ax=ax)
+        nx.draw_networkx_edges(G, pos, edgelist=edges,
+                               width=4, edge_color="green", ax=ax)
 
-    # Highlight start & goal
-    nx.draw_networkx_nodes(G, pos,
-                           nodelist=[start],
-                           node_color="green",
-                           node_size=400)
-
-    nx.draw_networkx_nodes(G, pos,
-                           nodelist=[goal],
-                           node_color="red",
-                           node_size=400)
+    nx.draw_networkx_nodes(G, pos, nodelist=[start], node_color="green", node_size=400)
+    nx.draw_networkx_nodes(G, pos, nodelist=[goal], node_color="red", node_size=400)
 
     nx.draw_networkx_labels(G, pos, font_size=6)
 
-    ax.set_title("Dynamic Route Graph")
     ax.axis("off")
-
     return fig
 
-# =========================
-# INITIAL GRAPH (EMPTY)
-# =========================
+# Initial graph
+_, _, _, G = ql.run_dynamic_route(start, goal)
 graph_placeholder.pyplot(draw_graph(G))
 
 # =========================
@@ -219,41 +172,21 @@ graph_placeholder.pyplot(draw_graph(G))
 # =========================
 if st.button("🚀 Find Route"):
 
-    # 👉 CALL YOUR Q-LEARNING FUNCTION
-    # ⚠️ You must have this function inside your file:
-    # run_dynamic_route(start, goal, df)
-    path, dist, event_map = ql.run_dynamic_route(start, goal, df)
+    path, dist, event_map, G = ql.run_dynamic_route(start, goal)
 
-    # =========================
-    # RESULT
-    # =========================
-    st.success("✅ Route Found")
+    if path is None:
+        st.error("❌ No path found")
+    else:
+        st.success("✅ Route Found")
 
-    st.write(f"📍 Path: {' → '.join(path)}")
-    st.write(f"📏 Distance: {dist:.2f} km")
+        st.write(f"📍 Path: {' → '.join(path)}")
+        st.write(f"📏 Distance: {dist:.2f} km")
 
-    # =========================
-    # UPDATE GRAPH (NO BLINK)
-    # =========================
-    fig = draw_graph(G, path, event_map)
-    graph_placeholder.pyplot(fig)
+        fig = draw_graph(G, path, event_map)
+        graph_placeholder.pyplot(fig)
 
-    # =========================
-    # LEGEND
-    # =========================
-    st.subheader("⚡ Dynamic Conditions")
-
-    st.write("🔴 Red → Blocked")
-    st.write("🟠 Orange → Traffic")
-    st.write("🟣 Purple → Road Work")
-    st.write("🔵 Blue → Weather")
-    st.write("🟢 Green → Selected Path")
-
-
-
-
-
-
+        st.subheader("⚡ Conditions")
+        st.write("🔴 Blocked | 🟠 Traffic | 🟣 Weather | 🟢 Path")
 
 
 
