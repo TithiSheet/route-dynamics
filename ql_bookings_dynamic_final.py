@@ -3,14 +3,14 @@
 # Next step (optional): refactor into modules & generate tests with RunCell
 # Quick start: pip install runcell
 
-''' import random
+import random
 import numpy as np
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
-df = pd.read_csv("bookings3.csv")   
+df = pd.read_csv("bookings.csv")   
 # Clean: convert and drop null distances
 df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
 df = df.dropna(subset=['Ride Distance'])
@@ -203,7 +203,7 @@ START_CITY = "AIIMS"          # <-- Change me!
 GOAL_CITY  = "Anand Vihar"    # <-- Change me!
 
 import pandas as pd
-_df = pd.read_csv("bookings3.csv")
+_df = pd.read_csv("bookings.csv")
 _df['Ride Distance'] = pd.to_numeric(_df['Ride Distance'], errors='coerce')
 _df = _df.dropna(subset=['Ride Distance'])
 _cities = sorted(set(_df['Pickup Location']).union(set(_df['Drop Location'])))
@@ -231,7 +231,7 @@ random.seed(42)
 np.random.seed(42)
 
 # -- Load data --
-df          = pd.read_csv("bookings3.csv")
+df          = pd.read_csv("bookings.csv")
 df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
 df          = df.dropna(subset=['Ride Distance'])
 cities      = sorted(set(df['Pickup Location']).union(set(df['Drop Location'])))
@@ -563,8 +563,8 @@ def run_dynamic_route(start_city, goal_city, df):
     nx.draw(G, pos, node_size=50, ax=ax)
     path_edges = list(zip(path, path[1:]))
     nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='red', width=3, ax=ax)
-    return path, dist, fig '''
-
+    return path, dist, fig 
+'''
 import pandas as pd
 import networkx as nx
 import random
@@ -643,7 +643,7 @@ def run_dynamic_route(start, goal):
     except:
         return None, None, None
 
-    return path, dist, event_map, G
+    return path, dist, event_map, G '''
 
 
 
