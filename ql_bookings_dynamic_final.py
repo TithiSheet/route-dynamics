@@ -564,86 +564,8 @@ def run_dynamic_route(start_city, goal_city, df):
     path_edges = list(zip(path, path[1:]))
     nx.draw_networkx_edges(G, pos, edgelist=path_edges, edge_color='red', width=3, ax=ax)
     return path, dist, fig 
-'''
-import pandas as pd
-import networkx as nx
-import random
 
-# =========================
-# LOAD DATA
-# =========================
-def load_data():
-    df = pd.read_csv(
-        "bookings3.csv",
-        encoding="latin1",
-        on_bad_lines="skip",
-        engine="python"
-    )
-    df.columns = df.columns.str.strip()
-    df['Ride Distance'] = pd.to_numeric(df['Ride Distance'], errors='coerce')
-    df = df.dropna(subset=['Ride Distance', 'Pickup Location', 'Drop Location'])
-    return df
 
-# =========================
-# BUILD GRAPH
-# =========================
-def build_graph(df):
-    G = nx.Graph()
-
-    for _, row in df.iterrows():
-        u = row['Pickup Location']
-        v = row['Drop Location']
-        d = row['Ride Distance']
-
-        if G.has_edge(u, v):
-            if d < G[u][v]['weight']:
-                G[u][v]['weight'] = d
-        else:
-            G.add_edge(u, v, weight=d)
-
-    return G
-
-# =========================
-# DYNAMIC CONDITIONS
-# =========================
-def apply_dynamic_conditions(G):
-    temp = G.copy()
-    event_map = {}
-
-    for u, v in list(temp.edges()):
-        r = random.random()
-
-        if r < 0.05:
-            temp.remove_edge(u, v)
-            event_map[(u, v)] = "BLOCKED"
-        elif r < 0.20:
-            temp[u][v]['weight'] *= 1.5
-            event_map[(u, v)] = "TRAFFIC"
-        elif r < 0.30:
-            temp[u][v]['weight'] *= 1.3
-            event_map[(u, v)] = "WEATHER"
-        else:
-            event_map[(u, v)] = "CLEAR"
-
-    return temp, event_map
-
-# =========================
-# MAIN FUNCTION (IMPORTANT)
-# =========================
-def run_dynamic_route(start, goal):
-
-    df = load_data()
-    G = build_graph(df)
-
-    temp_G, event_map = apply_dynamic_conditions(G)
-
-    try:
-        path = nx.shortest_path(temp_G, start, goal, weight='weight')
-        dist = nx.shortest_path_length(temp_G, start, goal, weight='weight')
-    except:
-        return None, None, None
-
-    return path, dist, event_map, G '''
 
 
 
